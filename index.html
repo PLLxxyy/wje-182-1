@@ -1633,6 +1633,42 @@
         line-height: 1.5;
       }
 
+      .feedback-item-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        justify-content: flex-end;
+      }
+
+      .feedback-action-btn {
+        padding: 4px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: all 0.2s;
+      }
+
+      .feedback-action-btn.edit {
+        background: #e6f7ff;
+        color: #1890ff;
+        border-color: #91d5ff;
+      }
+
+      .feedback-action-btn.edit:hover {
+        background: #bae7ff;
+      }
+
+      .feedback-action-btn.delete {
+        background: #fff2f0;
+        color: #ff4d4f;
+        border-color: #ffccc7;
+      }
+
+      .feedback-action-btn.delete:hover {
+        background: #ffccc7;
+      }
+
       .feedbacks-more {
         text-align: center;
         font-size: 12px;

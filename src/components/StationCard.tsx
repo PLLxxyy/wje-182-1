@@ -1,5 +1,5 @@
-import { ChargingStation, Feedback } from '../types';
-import { getFeedbacksByStation, getStationAverageRating } from '../utils/storage';
+import { ChargingStation, Feedback, FEEDBACK_ISSUES } from '../types';
+import { getFeedbacksByStation, getStationAverageRating, updateFeedback, deleteFeedback } from '../utils/storage';
 import { useState, useEffect } from 'react';
 
 interface Props {
@@ -17,9 +17,19 @@ export default function StationCard({ station, isFav, onToggleFavorite, onStartC
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [avgRating, setAvgRating] = useState(0);
 
-  useEffect(() => {
+  const [showEditFeedback, setShowEditFeedback] = useState(false);
+  const [editingFeedback, setEditingFeedback] = useState<Feedback | null>(null);
+  const [editRating, setEditRating] = useState(5);
+  const [editIssues, setEditIssues] = useState<string[]>([]);
+  const [editContent, setEditContent] = useState('');
+
+  const refreshFeedbacks = () => {
     setFeedbacks(getFeedbacksByStation(station.id));
     setAvgRating(getStationAverageRating(station.id));
+  };
+
+  useEffect(() => {
+    refreshFeedbacks();
   }, [station.id]);
 
   const formatDate = (timestamp: number) => {
@@ -41,6 +51,39 @@ export default function StationCard({ station, isFav, onToggleFavorite, onStartC
         ))}
       </div>
     );
+  };
+
+  const handleEditFeedback = (fb: Feedback) => {
+    setEditingFeedback(fb);
+    setEditRating(fb.rating);
+    setEditIssues([...fb.issues]);
+    setEditContent(fb.content);
+    setShowEditFeedback(true);
+  };
+
+  const handleDeleteFeedback = (fbId: string) => {
+    if (window.confirm('确定要删除这条反馈吗？')) {
+      deleteFeedback(fbId);
+      refreshFeedbacks();
+    }
+  };
+
+  const handleToggleEditIssue = (issue: string) => {
+    setEditIssues(prev =>
+      prev.includes(issue) ? prev.filter(i => i !== issue) : [...prev, issue]
+    );
+  };
+
+  const handleSaveEditFeedback = () => {
+    if (!editingFeedback) return;
+    updateFeedback(editingFeedback.id, {
+      rating: editRating,
+      issues: editIssues,
+      content: editContent.trim(),
+    });
+    setShowEditFeedback(false);
+    setEditingFeedback(null);
+    refreshFeedbacks();
   };
 
   return (
@@ -125,6 +168,20 @@ export default function StationCard({ station, isFav, onToggleFavorite, onStartC
                 {fb.content && (
                   <div className="feedback-item-content">{fb.content}</div>
                 )}
+                <div className="feedback-item-actions">
+                  <button
+                    className="feedback-action-btn edit"
+                    onClick={() => handleEditFeedback(fb)}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    className="feedback-action-btn delete"
+                    onClick={() => handleDeleteFeedback(fb.id)}
+                  >
+                    删除
+                  </button>
+                </div>
               </div>
             ))}
             {feedbacks.length > 5 && (
@@ -148,6 +205,78 @@ export default function StationCard({ station, isFav, onToggleFavorite, onStartC
       <button className="close-card-btn" onClick={onClose}>
         关闭
       </button>
+
+      {/* Edit Feedback Modal */}
+      {showEditFeedback && editingFeedback && (
+        <div className="modal-overlay" onClick={() => setShowEditFeedback(false)}>
+          <div className="feedback-modal" onClick={e => e.stopPropagation()}>
+            <div className="feedback-title">编辑反馈</div>
+            <div className="feedback-subtitle">修改您对本次充电的评价</div>
+            <div className="feedback-station-name">{editingFeedback.stationName}</div>
+
+            <div className="feedback-section">
+              <div className="feedback-label">综合评分</div>
+              <div className="rating-stars">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    className="star-btn"
+                    onClick={() => setEditRating(star)}
+                  >
+                    {star <= editRating ? '★' : '☆'}
+                  </button>
+                ))}
+                <span className="rating-text">
+                  {editRating === 5 ? '非常满意' : editRating === 4 ? '满意' : editRating === 3 ? '一般' : editRating === 2 ? '不满意' : '非常不满'}
+                </span>
+              </div>
+            </div>
+
+            <div className="feedback-section">
+              <div className="feedback-label">遇到的问题（可多选）</div>
+              <div className="issues-tags">
+                {FEEDBACK_ISSUES.map(issue => (
+                  <button
+                    key={issue}
+                    className={`issue-tag ${editIssues.includes(issue) ? 'selected' : ''}`}
+                    onClick={() => handleToggleEditIssue(issue)}
+                  >
+                    {issue}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="feedback-section">
+              <div className="feedback-label">详细描述（选填）</div>
+              <textarea
+                className="feedback-textarea"
+                placeholder="请描述您遇到的问题或建议..."
+                value={editContent}
+                onChange={e => setEditContent(e.target.value)}
+                rows={4}
+                maxLength={500}
+              />
+              <div className="textarea-counter">{editContent.length}/500</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 8 }}>
+              <button
+                className="feedback-cancel-btn"
+                onClick={() => setShowEditFeedback(false)}
+              >
+                取消
+              </button>
+              <button
+                className="feedback-submit-btn"
+                onClick={handleSaveEditFeedback}
+              >
+                保存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

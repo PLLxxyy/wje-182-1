@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChargingSession, ChargingStation, Feedback, FEEDBACK_ISSUES } from '../types';
-import { getCurrentSession, saveCurrentSession, addHistory, addFeedback, getFeedbackBySession } from '../utils/storage';
+import { getCurrentSession, saveCurrentSession, addHistory, addFeedback, getFeedbackBySession, updateFeedback } from '../utils/storage';
 import { mockStations } from '../utils/data';
 
 const BATTERY_CAPACITY = 60; // kWh - typical EV battery
@@ -51,6 +51,7 @@ export default function ChargingMonitorPage() {
   const [feedbackIssues, setFeedbackIssues] = useState<string[]>([]);
   const [feedbackContent, setFeedbackContent] = useState('');
   const [hasExistingFeedback, setHasExistingFeedback] = useState(false);
+  const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
   const [station, setStation] = useState<ChargingStation | null>(state?.station || null);
 
@@ -136,10 +137,12 @@ export default function ChargingMonitorPage() {
       const existing = getFeedbackBySession(session.id);
       setHasExistingFeedback(!!existing);
       if (existing) {
+        setEditingFeedbackId(existing.id);
         setFeedbackRating(existing.rating);
         setFeedbackIssues(existing.issues);
         setFeedbackContent(existing.content);
       } else {
+        setEditingFeedbackId(null);
         setFeedbackRating(5);
         setFeedbackIssues([]);
         setFeedbackContent('');
@@ -150,17 +153,25 @@ export default function ChargingMonitorPage() {
 
   const handleSubmitFeedback = () => {
     if (!session) return;
-    const feedback: Feedback = {
-      id: `fb-${Date.now()}`,
-      stationId: session.stationId,
-      stationName: session.stationName,
-      sessionId: session.id,
-      rating: feedbackRating,
-      issues: feedbackIssues,
-      content: feedbackContent.trim(),
-      createdAt: Date.now(),
-    };
-    addFeedback(feedback);
+    if (editingFeedbackId) {
+      updateFeedback(editingFeedbackId, {
+        rating: feedbackRating,
+        issues: feedbackIssues,
+        content: feedbackContent.trim(),
+      });
+    } else {
+      const feedback: Feedback = {
+        id: `fb-${Date.now()}`,
+        stationId: session.stationId,
+        stationName: session.stationName,
+        sessionId: session.id,
+        rating: feedbackRating,
+        issues: feedbackIssues,
+        content: feedbackContent.trim(),
+        createdAt: Date.now(),
+      };
+      addFeedback(feedback);
+    }
     setShowFeedback(false);
     setShowSettlement(false);
     navigate('/');
