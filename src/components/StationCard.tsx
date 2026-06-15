@@ -1,4 +1,6 @@
-import { ChargingStation } from '../types';
+import { ChargingStation, Feedback } from '../types';
+import { getFeedbacksByStation, getStationAverageRating } from '../utils/storage';
+import { useState, useEffect } from 'react';
 
 interface Props {
   station: ChargingStation;
@@ -12,6 +14,34 @@ interface Props {
 export default function StationCard({ station, isFav, onToggleFavorite, onStartCharge, onClose, hasActiveSession }: Props) {
   const canCharge = station.freeGuns > 0 && !hasActiveSession;
   const chargeTypeLabel = station.chargerType === 'fast' ? '快充' : station.chargerType === 'slow' ? '慢充' : '快充/慢充';
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+
+  useEffect(() => {
+    setFeedbacks(getFeedbacksByStation(station.id));
+    setAvgRating(getStationAverageRating(station.id));
+  }, [station.id]);
+
+  const formatDate = (timestamp: number) => {
+    const d = new Date(timestamp);
+    const month = d.getMonth() + 1;
+    const day = d.getDate();
+    const hour = d.getHours().toString().padStart(2, '0');
+    const min = d.getMinutes().toString().padStart(2, '0');
+    return `${month}月${day}日 ${hour}:${min}`;
+  };
+
+  const renderStars = (rating: number, size: 'small' | 'normal' = 'normal') => {
+    return (
+      <div className={size === 'small' ? 'stars-small' : 'stars-normal'}>
+        {[1, 2, 3, 4, 5].map(s => (
+          <span key={s} className={s <= rating ? 'star-filled' : 'star-empty'}>
+            {s <= rating ? '★' : '☆'}
+          </span>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="station-card">
@@ -21,6 +51,13 @@ export default function StationCard({ station, isFav, onToggleFavorite, onStartC
             {station.name}
           </div>
           <div className="station-address">{station.address}</div>
+          {feedbacks.length > 0 && (
+            <div className="station-rating-summary">
+              {renderStars(Math.round(avgRating), 'small')}
+              <span className="rating-score">{avgRating.toFixed(1)}</span>
+              <span className="rating-count">({feedbacks.length}条评价)</span>
+            </div>
+          )}
         </div>
         <button className="favorite-btn" onClick={onToggleFavorite}>
           {isFav ? '⭐' : '☆'}
@@ -58,6 +95,43 @@ export default function StationCard({ station, isFav, onToggleFavorite, onStartC
             </span>
           ))}
         </div>
+      </div>
+
+      {/* Feedbacks section */}
+      <div className="station-feedbacks">
+        <div className="feedbacks-title">
+          <span>📝 用户反馈</span>
+          <span className="feedbacks-count">{feedbacks.length}条</span>
+        </div>
+        {feedbacks.length === 0 ? (
+          <div className="feedbacks-empty">
+            暂无用户反馈，成为第一个评价的人吧
+          </div>
+        ) : (
+          <div className="feedbacks-list">
+            {feedbacks.slice(0, 5).map(fb => (
+              <div key={fb.id} className="feedback-item">
+                <div className="feedback-item-header">
+                  {renderStars(fb.rating, 'small')}
+                  <span className="feedback-item-date">{formatDate(fb.createdAt)}</span>
+                </div>
+                {fb.issues.length > 0 && (
+                  <div className="feedback-item-issues">
+                    {fb.issues.map(issue => (
+                      <span key={issue} className="feedback-issue-tag">{issue}</span>
+                    ))}
+                  </div>
+                )}
+                {fb.content && (
+                  <div className="feedback-item-content">{fb.content}</div>
+                )}
+              </div>
+            ))}
+            {feedbacks.length > 5 && (
+              <div className="feedbacks-more">查看全部 {feedbacks.length} 条反馈 →</div>
+            )}
+          </div>
+        )}
       </div>
 
       <button

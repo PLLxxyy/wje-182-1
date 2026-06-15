@@ -37,4 +37,26 @@ export interface ChargingSession {
   status: 'charging' | 'completed' | 'stopped';
 }
 
+export interface Feedback {
+  id: string;
+  stationId: string;
+  stationName: string;
+  sessionId: string;
+  rating: number; // 1-5 stars
+  issues: string[];
+  content: string;
+  createdAt: number;
+}
+
+export const FEEDBACK_ISSUES = [
+  '充电桩故障',
+  '充电速度慢',
+  '价格不合理',
+  '停车不方便',
+  '环境脏乱',
+  '网络信号差',
+  '安全隐患',
+  '其他问题',
+] as const;
+
 export type GridCellType = 'empty' | 'road' | 'block' | 'park' | 'water';

@@ -1,9 +1,10 @@
-import { ChargingSession, ChargingStation } from '../types';
+import { ChargingSession, ChargingStation, Feedback } from '../types';
 
 const KEYS = {
   FAVORITES: 'charging_favorites',
   HISTORY: 'charging_history',
   CURRENT_SESSION: 'charging_current_session',
+  FEEDBACKS: 'charging_feedbacks',
 };
 
 // ---- Favorites ----
@@ -91,4 +92,49 @@ export function getMonthlyStats(history: ChargingSession[]) {
   }
 
   return months;
+}
+
+// ---- Feedbacks ----
+export function getFeedbacks(): Feedback[] {
+  try {
+    const data = localStorage.getItem(KEYS.FEEDBACKS);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getFeedbacksByStation(stationId: string): Feedback[] {
+  return getFeedbacks().filter(f => f.stationId === stationId);
+}
+
+export function getFeedbackBySession(sessionId: string): Feedback | undefined {
+  return getFeedbacks().find(f => f.sessionId === sessionId);
+}
+
+export function addFeedback(feedback: Feedback): void {
+  const feedbacks = getFeedbacks();
+  feedbacks.unshift(feedback);
+  localStorage.setItem(KEYS.FEEDBACKS, JSON.stringify(feedbacks));
+}
+
+export function updateFeedback(id: string, updates: Partial<Feedback>): void {
+  const feedbacks = getFeedbacks();
+  const idx = feedbacks.findIndex(f => f.id === id);
+  if (idx >= 0) {
+    feedbacks[idx] = { ...feedbacks[idx], ...updates };
+    localStorage.setItem(KEYS.FEEDBACKS, JSON.stringify(feedbacks));
+  }
+}
+
+export function deleteFeedback(id: string): void {
+  const feedbacks = getFeedbacks().filter(f => f.id !== id);
+  localStorage.setItem(KEYS.FEEDBACKS, JSON.stringify(feedbacks));
+}
+
+export function getStationAverageRating(stationId: string): number {
+  const stationFeedbacks = getFeedbacksByStation(stationId);
+  if (stationFeedbacks.length === 0) return 0;
+  const sum = stationFeedbacks.reduce((acc, f) => acc + f.rating, 0);
+  return Math.round((sum / stationFeedbacks.length) * 10) / 10;
 }

@@ -1,20 +1,26 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getHistory, getFavorites, toggleFavorite, getMonthlyStats } from '../utils/storage';
+import { getHistory, getFavorites, toggleFavorite, getMonthlyStats, getFeedbacks, deleteFeedback } from '../utils/storage';
 import { mockStations } from '../utils/data';
-import { ChargingSession } from '../types';
+import { ChargingSession, Feedback } from '../types';
 
-type ProfileTab = 'history' | 'favorites' | 'stats';
+type ProfileTab = 'history' | 'favorites' | 'stats' | 'feedbacks';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<ProfileTab>('stats');
   const [history, setHistory] = useState<ChargingSession[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
 
-  useEffect(() => {
+  const refreshData = () => {
     setHistory(getHistory());
     setFavorites(getFavorites());
+    setFeedbacks(getFeedbacks());
+  };
+
+  useEffect(() => {
+    refreshData();
   }, []);
 
   const monthlyStats = useMemo(() => getMonthlyStats(history), [history]);
@@ -31,6 +37,13 @@ export default function ProfilePage() {
   const handleRemoveFavorite = (stationId: string) => {
     toggleFavorite(stationId);
     setFavorites(getFavorites());
+  };
+
+  const handleDeleteFeedback = (feedbackId: string) => {
+    if (window.confirm('确定要删除这条反馈吗？')) {
+      deleteFeedback(feedbackId);
+      setFeedbacks(getFeedbacks());
+    }
   };
 
   const maxCost = Math.max(...monthlyStats.map(m => m.cost), 1);
@@ -82,6 +95,7 @@ export default function ProfilePage() {
             { key: 'stats' as ProfileTab, label: '月度统计' },
             { key: 'history' as ProfileTab, label: '充电记录' },
             { key: 'favorites' as ProfileTab, label: '我的收藏' },
+            { key: 'feedbacks' as ProfileTab, label: '我的反馈' },
           ].map(t => (
             <button
               key={t.key}
@@ -220,6 +234,59 @@ export default function ProfilePage() {
                 >
                   取消收藏
                 </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Feedbacks Tab */}
+      {tab === 'feedbacks' && (
+        <div className="feedbacks-section">
+          <div className="section-title">📝 我的反馈</div>
+          {feedbacks.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📝</div>
+              <div className="empty-state-text">暂无反馈记录</div>
+              <div className="empty-state-sub">充电结束后可以为充电站写下使用反馈哦</div>
+            </div>
+          ) : (
+            feedbacks.map(fb => (
+              <div key={fb.id} className="my-feedback-item">
+                <div className="my-feedback-header">
+                  <div className="my-feedback-station">
+                    <span className="feedback-station-icon">⚡</span>
+                    {fb.stationName}
+                  </div>
+                  <button
+                    className="feedback-delete-btn"
+                    onClick={() => handleDeleteFeedback(fb.id)}
+                  >
+                    删除
+                  </button>
+                </div>
+                <div className="my-feedback-meta">
+                  <div className="my-feedback-stars">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <span key={s} className={s <= fb.rating ? 'star-filled' : 'star-empty'}>
+                        {s <= fb.rating ? '★' : '☆'}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="my-feedback-date">{formatDate(fb.createdAt)}</div>
+                </div>
+                {fb.issues.length > 0 && (
+                  <div className="my-feedback-issues">
+                    {fb.issues.map(issue => (
+                      <span key={issue} className="my-feedback-issue-tag">
+                        {issue}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {fb.content && (
+                  <div className="my-feedback-content">{fb.content}</div>
+                )}
               </div>
             ))
           )}

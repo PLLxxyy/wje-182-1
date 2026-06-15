@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ChargingSession, ChargingStation } from '../types';
-import { getCurrentSession, saveCurrentSession, addHistory } from '../utils/storage';
+import { ChargingSession, ChargingStation, Feedback, FEEDBACK_ISSUES } from '../types';
+import { getCurrentSession, saveCurrentSession, addHistory, addFeedback, getFeedbackBySession } from '../utils/storage';
 import { mockStations } from '../utils/data';
 
 const BATTERY_CAPACITY = 60; // kWh - typical EV battery
@@ -46,6 +46,11 @@ export default function ChargingMonitorPage() {
   });
 
   const [showSettlement, setShowSettlement] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackIssues, setFeedbackIssues] = useState<string[]>([]);
+  const [feedbackContent, setFeedbackContent] = useState('');
+  const [hasExistingFeedback, setHasExistingFeedback] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const [station, setStation] = useState<ChargingStation | null>(state?.station || null);
 
@@ -116,6 +121,47 @@ export default function ChargingMonitorPage() {
   };
 
   const handleCloseSettlement = () => {
+    setShowSettlement(false);
+    navigate('/');
+  };
+
+  const handleToggleIssue = (issue: string) => {
+    setFeedbackIssues(prev =>
+      prev.includes(issue) ? prev.filter(i => i !== issue) : [...prev, issue]
+    );
+  };
+
+  const handleOpenFeedback = () => {
+    if (session) {
+      const existing = getFeedbackBySession(session.id);
+      setHasExistingFeedback(!!existing);
+      if (existing) {
+        setFeedbackRating(existing.rating);
+        setFeedbackIssues(existing.issues);
+        setFeedbackContent(existing.content);
+      } else {
+        setFeedbackRating(5);
+        setFeedbackIssues([]);
+        setFeedbackContent('');
+      }
+    }
+    setShowFeedback(true);
+  };
+
+  const handleSubmitFeedback = () => {
+    if (!session) return;
+    const feedback: Feedback = {
+      id: `fb-${Date.now()}`,
+      stationId: session.stationId,
+      stationName: session.stationName,
+      sessionId: session.id,
+      rating: feedbackRating,
+      issues: feedbackIssues,
+      content: feedbackContent.trim(),
+      createdAt: Date.now(),
+    };
+    addFeedback(feedback);
+    setShowFeedback(false);
     setShowSettlement(false);
     navigate('/');
   };
@@ -299,9 +345,100 @@ export default function ChargingMonitorPage() {
               </div>
             </div>
 
-            <button className="settlement-close-btn" onClick={handleCloseSettlement}>
-              返回首页
-            </button>
+            <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+              <button
+                className="settlement-close-btn"
+                style={{ flex: 1, background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+                onClick={handleCloseSettlement}
+              >
+                返回首页
+              </button>
+              <button
+                className="settlement-close-btn"
+                style={{ flex: 1 }}
+                onClick={handleOpenFeedback}
+              >
+                {hasExistingFeedback ? '修改反馈' : '写使用反馈'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback modal */}
+      {showFeedback && session && (
+        <div className="modal-overlay" onClick={() => setShowFeedback(false)}>
+          <div className="feedback-modal" onClick={e => e.stopPropagation()}>
+            <div className="feedback-title">使用反馈</div>
+            <div className="feedback-subtitle">
+              {hasExistingFeedback ? '修改您对本次充电的评价' : '欢迎分享您的充电体验'}
+            </div>
+
+            <div className="feedback-station-name">{session.stationName}</div>
+
+            {/* Rating stars */}
+            <div className="feedback-section">
+              <div className="feedback-label">综合评分</div>
+              <div className="rating-stars">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button
+                    key={star}
+                    className="star-btn"
+                    onClick={() => setFeedbackRating(star)}
+                  >
+                    {star <= feedbackRating ? '★' : '☆'}
+                  </button>
+                ))}
+                <span className="rating-text">
+                  {feedbackRating === 5 ? '非常满意' : feedbackRating === 4 ? '满意' : feedbackRating === 3 ? '一般' : feedbackRating === 2 ? '不满意' : '非常不满'}
+                </span>
+              </div>
+            </div>
+
+            {/* Issues tags */}
+            <div className="feedback-section">
+              <div className="feedback-label">遇到的问题（可多选）</div>
+              <div className="issues-tags">
+                {FEEDBACK_ISSUES.map(issue => (
+                  <button
+                    key={issue}
+                    className={`issue-tag ${feedbackIssues.includes(issue) ? 'selected' : ''}`}
+                    onClick={() => handleToggleIssue(issue)}
+                  >
+                    {issue}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content textarea */}
+            <div className="feedback-section">
+              <div className="feedback-label">详细描述（选填）</div>
+              <textarea
+                className="feedback-textarea"
+                placeholder="请描述您遇到的问题或建议..."
+                value={feedbackContent}
+                onChange={e => setFeedbackContent(e.target.value)}
+                rows={4}
+                maxLength={500}
+              />
+              <div className="textarea-counter">{feedbackContent.length}/500</div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, width: '100%', marginTop: 8 }}>
+              <button
+                className="feedback-cancel-btn"
+                onClick={() => setShowFeedback(false)}
+              >
+                取消
+              </button>
+              <button
+                className="feedback-submit-btn"
+                onClick={handleSubmitFeedback}
+              >
+                提交反馈
+              </button>
+            </div>
           </div>
         </div>
       )}
